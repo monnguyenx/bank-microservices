@@ -37,16 +37,15 @@ router.post('/register', async (req, res, next) => {
     const idNumber = req.body.idNumber || req.body.id_number;
 
     // 1. Kiểm tra tính hợp lệ cơ bản của dữ liệu đầu vào
-    if (!username || typeof username !== 'string' || !username.trim()) {
+    const cleanUsername = typeof username === 'string' ? username.trim() : '';
+    if (!/^[a-zA-Z0-9_.]{3,50}$/.test(cleanUsername)) {
       return res.status(400).json({
         error: {
-          code: 'INVALID_INPUT',
-          message: 'Tên đăng nhập không được để trống',
+          code: 'INVALID_USERNAME',
+          message: 'Tên đăng nhập 3-50 ký tự, chỉ gồm chữ không dấu, số, dấu chấm, gạch dưới',
         },
       });
     }
-
-    const cleanUsername = username.trim();
 
     // BR-13: Mật khẩu tối thiểu 8 ký tự
     if (!password || typeof password !== 'string' || password.length < 8) {
@@ -155,14 +154,66 @@ router.post('/register', async (req, res, next) => {
     const passwordHash = await bcrypt.hash(password, 10);
 
     // 5. Lưu thông tin người dùng vào auth_svc.users với vai trò CUSTOMER
-    const insertUserRes = await pool.query(
-      `INSERT INTO auth_svc.users (username, password_hash, role, customer_id)
-       VALUES ($1, $2, 'CUSTOMER', $3)
-       RETURNING id, username, role, customer_id, created_at`,
-      [cleanUsername, passwordHash, customerId]
-    );
+    // Bọc trong try/catch để thực hiện Giao dịch bù trừ (Saga pattern) nếu có lỗi
+    let newUser;
+    try {
+      const insertUserRes = await pool.query(
+        `INSERT INTO auth_svc.users (username, password_hash, role, customer_id)
+         VALUES ($1, $2, 'CUSTOMER', $3)
+         RETURNING id, username, role, customer_id, created_at`,
+        [cleanUsername, passwordHash, customerId]
+      );
+      newUser = insertUserRes.rows[0];
+    } catch (insertErr) {
+      logger.warn('INSERT user thất bại, bắt đầu giao dịch bù trừ (xóa khách hàng tại account-service)', {
+        requestId: req.requestId,
+        customerId,
+        error: insertErr.message,
+      });
 
-    const newUser = insertUserRes.rows[0];
+      // Giao dịch bù trừ: Gọi account-service xóa khách hàng mồ côi vừa tạo
+      try {
+        const compensateRes = await fetch(`${config.accountServiceUrl}/internal/customers/${customerId}`, {
+          method: 'DELETE',
+          headers: {
+            'X-Internal-Key': config.internalApiKey,
+            'X-Request-Id': req.requestId,
+          },
+          signal: AbortSignal.timeout(5000),
+        });
+
+        if (!compensateRes.ok) {
+          logger.error('Giao dịch bù trừ thất bại tại account-service! Cần can thiệp thủ công', {
+            requestId: req.requestId,
+            customerId,
+            status: compensateRes.status,
+          });
+        } else {
+          logger.info('Giao dịch bù trừ thành công: Đã xóa khách hàng tại account-service', {
+            requestId: req.requestId,
+            customerId,
+          });
+        }
+      } catch (compensateErr) {
+        logger.error('Lỗi kết nối khi thực hiện giao dịch bù trừ sang account-service! Cần can thiệp thủ công', {
+          requestId: req.requestId,
+          customerId,
+          error: compensateErr.message,
+        });
+      }
+
+      // Trả lỗi cho client như cũ: 409 nếu trùng username (race condition), 500 nếu lỗi khác
+      if (insertErr.code === '23505') {
+        return res.status(409).json({
+          error: {
+            code: 'USERNAME_TAKEN',
+            message: 'Tên đăng nhập đã được sử dụng',
+          },
+        });
+      }
+
+      throw insertErr;
+    }
 
     logger.info('Đăng ký người dùng mới thành công', {
       requestId: req.requestId,
@@ -179,14 +230,6 @@ router.post('/register', async (req, res, next) => {
       createdAt: newUser.created_at,
     });
   } catch (err) {
-    if (err.code === '23505') {
-      return res.status(409).json({
-        error: {
-          code: 'USERNAME_TAKEN',
-          message: 'Tên đăng nhập đã được sử dụng',
-        },
-      });
-    }
     next(err);
   }
 });

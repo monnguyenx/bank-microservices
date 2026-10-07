@@ -101,6 +101,71 @@ router.post('/customers', async (req, res, next) => {
 });
 
 /**
+ * DELETE /internal/customers/:id
+ * Giao dịch bù trừ (Compensating action) cho Saga pattern:
+ * auth-service gọi khi tạo user thất bại sau khi đã tạo khách hàng.
+ * CHỈ xóa nếu khách hàng chưa có bất kỳ tài khoản nào, ngược lại trả 409.
+ */
+router.delete('/customers/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+    if (!id || !UUID_REGEX.test(id)) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_ID',
+          message: 'Định dạng ID khách hàng không hợp lệ',
+        },
+      });
+    }
+
+    // Kiểm tra xem khách hàng đã có tài khoản nào chưa
+    const accCountRes = await pool.query(
+      'SELECT COUNT(*) FROM account_svc.accounts WHERE customer_id = $1',
+      [id]
+    );
+
+    if (parseInt(accCountRes.rows[0].count, 10) > 0) {
+      return res.status(409).json({
+        error: {
+          code: 'CUSTOMER_HAS_ACCOUNTS',
+          message: 'Không thể xóa khách hàng đã có tài khoản ngân hàng liên kết',
+        },
+      });
+    }
+
+    // Xóa khách hàng
+    const deleteRes = await pool.query(
+      'DELETE FROM account_svc.customers WHERE id = $1 RETURNING id',
+      [id]
+    );
+
+    if (deleteRes.rows.length === 0) {
+      return res.status(404).json({
+        error: {
+          code: 'CUSTOMER_NOT_FOUND',
+          message: 'Khách hàng không tồn tại',
+        },
+      });
+    }
+
+    logger.info('Xóa khách hàng bù trừ thành công', {
+      requestId: req.requestId,
+      customerId: id,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Đã xóa khách hàng bù trừ thành công',
+      customerId: id,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /internal/accounts/:accountNumber
  * transaction-service gọi để lấy thông tin chủ sở hữu, trạng thái, số dư
  */
