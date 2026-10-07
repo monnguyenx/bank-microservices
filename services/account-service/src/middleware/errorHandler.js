@@ -1,29 +1,40 @@
 /**
  * Error Handler Middleware
  * Định dạng chuẩn: { "error": { "code": "...", "message": "..." } }
+ * Không làm lộ chi tiết lỗi nội bộ hoặc mã lỗi SQL của PostgreSQL cho client.
  */
 
 const logger = require('../logger');
 
 module.exports = function errorHandler(err, req, res, next) {
   const statusCode = err.status || err.statusCode || 500;
-  const errorCode = err.code || 'INTERNAL_SERVER_ERROR';
-  const errorMessage = err.message || 'Lỗi xử lý yêu cầu trên máy chủ';
 
+  // Ghi log chi tiết lỗi nội bộ ra stdout phục vụ truy vết và debug
   logger.error('Lỗi khi xử lý request', {
     requestId: req.requestId,
     method: req.method,
     url: req.originalUrl,
     statusCode,
-    errorCode,
+    pgCode: err.code,
     error: err.message,
     stack: err.stack,
   });
 
+  // Với lỗi 500 / lỗi hệ thống nội bộ: trả về thông báo chung chung, ẩn mã lỗi SQL
+  if (statusCode >= 500) {
+    return res.status(500).json({
+      error: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Đã có lỗi xảy ra trên hệ thống, vui lòng thử lại sau',
+      },
+    });
+  }
+
+  // Với các lỗi 4xx nghiệp vụ có mã rõ ràng
   res.status(statusCode).json({
     error: {
-      code: errorCode,
-      message: errorMessage,
+      code: err.code || 'BAD_REQUEST',
+      message: err.message || 'Yêu cầu không hợp lệ',
     },
   });
 };
