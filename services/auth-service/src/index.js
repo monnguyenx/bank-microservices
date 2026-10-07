@@ -28,8 +28,11 @@ app.use(express.json());
 // Gán và chuyển tiếp X-Request-Id
 app.use(requestIdMiddleware);
 
-// Middleware ghi log request vào/ra theo chuẩn JSON
+// Middleware ghi log request vào/ra theo chuẩn JSON (bỏ qua /health)
 app.use((req, res, next) => {
+  if (req.path.startsWith('/health')) {
+    return next();
+  }
   const start = Date.now();
   res.on('finish', () => {
     const durationMs = Date.now() - start;

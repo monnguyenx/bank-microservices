@@ -2,7 +2,7 @@
  * Router xác thực (/api/auth)
  * Cung cấp các API:
  * - POST /api/auth/register (Công khai): Tạo khách hàng qua account-service rồi tạo user CUSTOMER
- * - POST /api/auth/login (Công khai): Trả { token, user } với JWT hết hạn 1 giờ
+ * - POST /api/auth/login (Công khai): Trả { token, user } với JWT HS256 hết hạn 1 giờ
  * - GET /api/auth/me (Bearer JWT): Thông tin người dùng hiện tại
  * Tuân thủ quy tắc nghiệp vụ: BR-13, BR-14
  */
@@ -17,10 +17,18 @@ const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
 
+const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
 /**
  * POST /api/auth/register
  * Tạo khách hàng mới rồi tạo tài khoản người dùng CUSTOMER
  * Body: { username, password, fullName, idNumber, phone, email }
+ *
+ * Yêu cầu:
+ * - Kiểm tra username đã tồn tại và mật khẩu hợp lệ TRƯỚC khi gọi account-service để tránh tạo khách hàng thừa.
+ * - Gọi POST {ACCOUNT_SERVICE_URL}/internal/customers kèm header X-Internal-Key và X-Request-Id, timeout 5 giây.
+ * - account-service lỗi (5xx) hoặc timeout thì trả 503 SERVICE_UNAVAILABLE.
+ * - Lỗi 400/409 từ account-service (INVALID_ID_NUMBER, ID_NUMBER_TAKEN) thì trả nguyên mã lỗi đó.
  */
 router.post('/register', async (req, res, next) => {
   try {
@@ -71,7 +79,7 @@ router.post('/register', async (req, res, next) => {
 
     const cleanIdNumber = String(idNumber).trim();
 
-    // 2. BR-13: Kiểm tra tên đăng nhập duy nhất trong auth_svc.users
+    // 2. BR-13: Kiểm tra tên đăng nhập duy nhất trong auth_svc.users TRƯỚC KHI gọi account-service
     const existingUserRes = await pool.query(
       'SELECT id FROM auth_svc.users WHERE username = $1',
       [cleanUsername]
@@ -86,8 +94,7 @@ router.post('/register', async (req, res, next) => {
       });
     }
 
-    // 3. Gọi sang account-service để tạo khách hàng (Internal API)
-    // Dùng native fetch của Node 20 với timeout 5 giây
+    // 3. Sau khi xác thực hợp lệ toàn bộ thông tin nội bộ, mới gọi sang account-service để tạo khách hàng
     let customerId = null;
     try {
       const accountServiceRes = await fetch(`${config.accountServiceUrl}/internal/customers`, {
@@ -103,20 +110,24 @@ router.post('/register', async (req, res, next) => {
           phone: phone ? String(phone).trim() : null,
           email: email ? String(email).trim() : null,
         }),
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(5000), // Timeout 5 giây
       });
 
       const accountData = await accountServiceRes.json().catch(() => null);
 
       if (!accountServiceRes.ok) {
-        // Nếu account-service trả lỗi (ví dụ 409 ID_NUMBER_TAKEN), forward lại cho client
-        if (accountData && accountData.error) {
-          return res.status(accountServiceRes.status).json(accountData);
+        // Lỗi 400/409 từ account-service (ví dụ INVALID_ID_NUMBER, ID_NUMBER_TAKEN) thì trả nguyên mã lỗi đó
+        if (accountServiceRes.status === 400 || accountServiceRes.status === 409) {
+          if (accountData && accountData.error) {
+            return res.status(accountServiceRes.status).json(accountData);
+          }
         }
-        return res.status(accountServiceRes.status).json({
+
+        // Các lỗi khác của account-service (5xx hoặc lỗi bất ngờ) -> trả 503 SERVICE_UNAVAILABLE
+        return res.status(503).json({
           error: {
-            code: 'ACCOUNT_SERVICE_ERROR',
-            message: 'Tạo thông tin khách hàng tại account-service thất bại',
+            code: 'SERVICE_UNAVAILABLE',
+            message: 'account-service không phản hồi hoặc gặp lỗi',
           },
         });
       }
@@ -131,7 +142,7 @@ router.post('/register', async (req, res, next) => {
         error: fetchErr.message,
       });
 
-      // Nếu timeout hoặc mất kết nối: trả 503
+      // Nếu timeout hoặc mất kết nối: trả 503 SERVICE_UNAVAILABLE
       return res.status(503).json({
         error: {
           code: 'SERVICE_UNAVAILABLE',
@@ -184,6 +195,10 @@ router.post('/register', async (req, res, next) => {
  * POST /api/auth/login
  * Đăng nhập người dùng, trả token JWT và thông tin user
  * Body: { username, password }
+ *
+ * Yêu cầu:
+ * - Sai username hoặc sai mật khẩu đều trả cùng một lỗi 401 INVALID_CREDENTIALS để không lộ username nào tồn tại.
+ * - JWT ký bằng HS256, hết hạn 1 giờ, payload gồm sub, role, customerId.
  */
 router.post('/login', async (req, res, next) => {
   try {
@@ -204,6 +219,7 @@ router.post('/login', async (req, res, next) => {
       [username.trim()]
     );
 
+    // Nếu không tìm thấy người dùng -> trả 401 INVALID_CREDENTIALS
     if (userRes.rows.length === 0) {
       return res.status(401).json({
         error: {
@@ -217,6 +233,8 @@ router.post('/login', async (req, res, next) => {
 
     // So khớp mật khẩu đã hash với bcrypt
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+
+    // Nếu sai mật khẩu -> cũng trả cùng lỗi 401 INVALID_CREDENTIALS để không lộ username
     if (!isPasswordValid) {
       return res.status(401).json({
         error: {
@@ -226,7 +244,7 @@ router.post('/login', async (req, res, next) => {
       });
     }
 
-    // Tạo JWT token: thời hạn 1 giờ, chứa sub, role, customerId
+    // Tạo JWT token: thời hạn 1 giờ, thuật toán HS256, payload gồm sub, role, customerId
     const token = jwt.sign(
       {
         sub: user.id,
@@ -234,7 +252,10 @@ router.post('/login', async (req, res, next) => {
         customerId: user.customer_id,
       },
       config.jwtSecret,
-      { expiresIn: '1h' }
+      {
+        algorithm: 'HS256',
+        expiresIn: '1h',
+      }
     );
 
     logger.info('Người dùng đăng nhập thành công', {
@@ -261,10 +282,21 @@ router.post('/login', async (req, res, next) => {
 /**
  * GET /api/auth/me
  * Lấy thông tin tài khoản của người dùng hiện tại (yêu cầu JWT)
+ * Kiểm tra định dạng UUID trước khi truy vấn, sai định dạng trả 400.
  */
 router.get('/me', authMiddleware, async (req, res, next) => {
   try {
     const userId = req.user.id;
+
+    // Kiểm tra định dạng UUID trước khi truy vấn DB
+    if (!userId || !UUID_REGEX.test(userId)) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_ID',
+          message: 'Định dạng ID người dùng không hợp lệ',
+        },
+      });
+    }
 
     const userRes = await pool.query(
       'SELECT id, username, role, customer_id, created_at FROM auth_svc.users WHERE id = $1',

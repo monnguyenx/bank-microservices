@@ -20,7 +20,9 @@ module.exports = function authMiddleware(req, res, next) {
 
   const token = authHeader.substring(7).trim();
   try {
-    const decoded = jwt.verify(token, config.jwtSecret);
+    const decoded = jwt.verify(token, config.jwtSecret, {
+      algorithms: ['HS256'],
+    });
     req.user = {
       id: decoded.sub,
       role: decoded.role,

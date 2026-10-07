@@ -25,13 +25,13 @@ const DEMO_USERS = [
   },
   {
     id: 'f0000000-0000-0000-0000-000000000001',
-    username: 'user_a',
+    username: 'nguyenvana',
     role: 'CUSTOMER',
     customerId: 'a0000000-0000-0000-0000-000000000001',
   },
   {
     id: 'f0000000-0000-0000-0000-000000000002',
-    username: 'user_b',
+    username: 'tranthib',
     role: 'CUSTOMER',
     customerId: 'a0000000-0000-0000-0000-000000000002',
   },
