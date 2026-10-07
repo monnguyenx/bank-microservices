@@ -82,9 +82,6 @@ async function initDb() {
   try {
     logger.info('Bắt đầu kiểm tra và tạo Schema/Bảng cho account_svc...');
 
-    // Đảm bảo extension pgcrypto (nếu cần cho gen_random_uuid ở các bản postgres cũ)
-    await client.query('CREATE EXTENSION IF NOT EXISTS "pgcrypto";');
-
     // Tạo schema riêng cho account-service
     await client.query('CREATE SCHEMA IF NOT EXISTS account_svc;');
 
