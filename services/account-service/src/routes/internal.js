@@ -181,10 +181,42 @@ router.post('/postings', async (req, res, next) => {
     });
   }
 
-  // Kết nối client riêng từ pool để thực thi Transaction
-  const client = await pool.connect();
+  // Kiểm tra từng entry: accountNumber và amount (phải là số nguyên khác 0)
+  for (const entry of entries) {
+    if (!entry || typeof entry !== 'object' || !entry.accountNumber) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_ENTRIES',
+          message: 'Mỗi bút toán phải có accountNumber hợp lệ',
+        },
+      });
+    }
 
+    if (entry.amount === undefined || entry.amount === null) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_AMOUNT',
+          message: 'Số tiền bút toán không được để trống',
+        },
+      });
+    }
+
+    // Kiểm tra amount là số nguyên khác 0 (không nhận số 0, số lẻ, chuỗi linh tinh)
+    const amountStr = String(entry.amount).trim();
+    if (!/^-?[1-9]\d*$/.test(amountStr)) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_AMOUNT',
+          message: 'Số tiền bút toán phải là số nguyên khác 0',
+        },
+      });
+    }
+  }
+
+  let client;
   try {
+    // Kết nối client riêng từ pool để thực thi Transaction
+    client = await pool.connect();
     await client.query('BEGIN');
 
     // 1. Kiểm tra Idempotency trong processed_requests
@@ -356,15 +388,23 @@ router.post('/postings', async (req, res, next) => {
 
     return res.status(200).json(responseData);
   } catch (err) {
-    await client.query('ROLLBACK');
-    logger.error('Lỗi trong quá trình hạch toán posting (đã ROLLBACK)', {
+    if (client) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackErr) {
+        logger.error('Lỗi khi ROLLBACK transaction', { error: rollbackErr.message });
+      }
+    }
+    logger.error('Lỗi trong quá trình hạch toán posting', {
       requestId: req.requestId,
       error: err.message,
       stack: err.stack,
     });
     next(err);
   } finally {
-    client.release();
+    if (client) {
+      client.release();
+    }
   }
 });
 
