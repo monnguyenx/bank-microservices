@@ -20,6 +20,15 @@ module.exports = function errorHandler(err, req, res, next) {
     stack: err.stack,
   });
 
+  if (statusCode === 503) {
+    return res.status(503).json({
+      error: {
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Dịch vụ tạm thời không khả dụng, vui lòng thử lại sau',
+      },
+    });
+  }
+
   // Với lỗi 500 / lỗi hệ thống nội bộ: trả về thông báo chung chung, ẩn mã lỗi SQL
   if (statusCode >= 500) {
     return res.status(500).json({
