@@ -434,7 +434,7 @@ router.post('/withdraw', async (req, res, next) => {
            WHERE from_account = $1
              AND type IN ('WITHDRAW', 'TRANSFER')
              AND status IN ('COMPLETED', 'PENDING')
-             AND created_at >= (timezone('Asia/Ho_Chi_Minh', now())::date AT TIME ZONE 'Asia/Ho_Chi_Minh')`,
+             AND created_at >= (date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh')`,
           [cleanFromAccount]
         );
 
@@ -645,7 +645,7 @@ router.post('/transfer', async (req, res, next) => {
            WHERE from_account = $1
              AND type IN ('WITHDRAW', 'TRANSFER')
              AND status IN ('COMPLETED', 'PENDING')
-             AND created_at >= (timezone('Asia/Ho_Chi_Minh', now())::date AT TIME ZONE 'Asia/Ho_Chi_Minh')`,
+             AND created_at >= (date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh')`,
           [cleanFromAccount]
         );
 
