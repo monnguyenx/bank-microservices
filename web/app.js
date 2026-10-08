@@ -258,8 +258,8 @@
         data = await res.json().catch(() => null);
       }
 
-      // Nhận 401: phiên hết hạn -> xóa token và quay về đăng nhập
-      if (res.status === 401) {
+      // Nhận 401: chỉ coi là hết phiên khi đang có token và không phải đang đăng nhập
+      if (res.status === 401 && STATE.token && !path.startsWith('/api/auth/login')) {
         handleLogout(false);
         showToast('Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.', 'warning');
         const unauthErr = new Error('UNAUTHORIZED');
