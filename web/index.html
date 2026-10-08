@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mini Bank - Ngân hàng Trực tuyến</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Header / Navigation Bar -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <span class="brand-icon">🏦</span>
+        <div class="brand-text">
+          <span class="brand-title">Mini Bank</span>
+          <span class="brand-sub">Ngân hàng Trực tuyến Microservices</span>
+        </div>
+      </div>
+
+      <div id="userProfile" class="user-profile hidden">
+        <div class="user-meta">
+          <span id="userNameDisplay" class="user-name">Người dùng</span>
+          <span id="userRoleBadge" class="badge badge-customer">CUSTOMER</span>
+        </div>
+        <button id="logoutBtn" class="btn btn-outline-danger btn-sm" title="Đăng xuất">
+          <span>Đăng xuất</span> 🚪
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-content">
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+    <!-- Section: Auth (Chưa đăng nhập) -->
+    <section id="authSection" class="auth-section">
+      <div class="auth-card">
+        <div class="auth-tabs">
+          <button id="tabLoginBtn" class="auth-tab-btn active">Đăng nhập</button>
+          <button id="tabRegisterBtn" class="auth-tab-btn">Đăng ký tài khoản</button>
+        </div>
+
+        <!-- Form Đăng nhập -->
+        <div id="loginFormContainer" class="auth-form-container">
+          <form id="loginForm" class="form-grid">
+            <div class="form-group">
+              <label for="loginUsername">Tên đăng nhập <span class="required">*</span></label>
+              <input type="text" id="loginUsername" required placeholder="Nhập tên đăng nhập" autocomplete="username">
+            </div>
+
+            <div class="form-group">
+              <label for="loginPassword">Mật khẩu <span class="required">*</span></label>
+              <input type="password" id="loginPassword" required placeholder="Nhập mật khẩu" autocomplete="current-password">
+            </div>
+
+            <button type="submit" id="loginSubmitBtn" class="btn btn-primary btn-block">
+              <span>Đăng nhập</span>
+            </button>
+          </form>
+
+          <!-- Tài khoản mẫu để kiểm tra nhanh -->
+          <div class="demo-accounts-box">
+            <p class="demo-title">💡 Tài khoản mẫu để kiểm tra nhanh:</p>
+            <div class="demo-buttons">
+              <button type="button" class="btn btn-sm btn-ghost demo-fill-btn" data-user="admin" data-pass="Secret@123456">
+                🛡️ Admin (admin)
+              </button>
+              <button type="button" class="btn btn-sm btn-ghost demo-fill-btn" data-user="nguyenvana" data-pass="Secret@123456">
+                👤 Khách hàng A (nguyenvana)
+              </button>
+              <button type="button" class="btn btn-sm btn-ghost demo-fill-btn" data-user="tranthib" data-pass="Secret@123456">
+                👤 Khách hàng B (tranthib)
+              </button>
+            </div>
+            <p class="demo-hint">* Nếu hệ thống đã seed với SEED_DEMO_DATA=true, mật khẩu mặc định là giá trị SEED_PASSWORD.</p>
+          </div>
+        </div>
+
+        <!-- Form Đăng ký -->
+        <div id="registerFormContainer" class="auth-form-container hidden">
+          <form id="registerForm" class="form-grid">
+            <div class="form-row">
+              <div class="form-group col-6">
+                <label for="regUsername">Tên đăng nhập <span class="required">*</span></label>
+                <input type="text" id="regUsername" required placeholder="3-50 ký tự (a-z, 0-9, _, .)" pattern="^[a-zA-Z0-9_.]{3,50}$" title="Từ 3-50 ký tự gồm chữ, số, gạch dưới hoặc dấu chấm">
+              </div>
+
+              <div class="form-group col-6">
+                <label for="regPassword">Mật khẩu <span class="required">*</span></label>
+                <input type="password" id="regPassword" required placeholder="Tối thiểu 8 ký tự" minlength="8">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="regFullName">Họ và tên <span class="required">*</span></label>
+              <input type="text" id="regFullName" required placeholder="Ví dụ: Nguyễn Văn An">
+            </div>
+
+            <div class="form-group">
+              <label for="regIdNumber">Số CCCD / CMND <span class="required">*</span></label>
+              <input type="text" id="regIdNumber" required placeholder="Đúng 12 chữ số" pattern="^\d{12}$" maxlength="12" title="Số CCCD phải gồm đúng 12 chữ số">
+            </div>
+
+            <div class="form-row">
+              <div class="form-group col-6">
+                <label for="regPhone">Số điện thoại</label>
+                <input type="tel" id="regPhone" placeholder="Ví dụ: 0912345678">
+              </div>
+
+              <div class="form-group col-6">
+                <label for="regEmail">Email</label>
+                <input type="email" id="regEmail" placeholder="Ví dụ: an@example.com">
+              </div>
+            </div>
+
+            <button type="submit" id="registerSubmitBtn" class="btn btn-primary btn-block">
+              <span>Đăng ký tài khoản</span>
+            </button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: Dashboard (Đã đăng nhập) -->
+    <section id="dashboardSection" class="dashboard-section hidden">
+      <!-- Tab Navigation Menu -->
+      <nav class="dashboard-nav">
+        <button class="nav-tab active" data-tab="accountsTab">
+          💳 <span class="tab-label">Tài khoản</span>
+        </button>
+        <button class="nav-tab customer-only" data-tab="transferTab">
+          💸 <span class="tab-label">Chuyển khoản</span>
+        </button>
+        <button class="nav-tab customer-only" data-tab="withdrawTab">
+          💵 <span class="tab-label">Rút tiền</span>
+        </button>
+        <button class="nav-tab admin-only hidden" data-tab="depositTab">
+          📥 <span class="tab-label">Nạp tiền (Admin)</span>
+        </button>
+        <button class="nav-tab" data-tab="historyTab">
+          📜 <span class="tab-label">Lịch sử & Sao kê</span>
+        </button>
+      </nav>
+
+      <!-- Tab Content 1: Quản lý tài khoản -->
+      <div id="accountsTab" class="tab-pane active">
+        <div class="tab-header">
+          <div>
+            <h2 class="tab-title">Danh sách tài khoản thanh toán</h2>
+            <p class="tab-subtitle">Theo dõi số dư và quản lý các tài khoản ngân hàng của bạn</p>
+          </div>
+          <div class="tab-actions">
+            <button id="openAccountBtn" class="btn btn-primary customer-only">
+              ➕ Mở tài khoản mới
+            </button>
+            <button id="refreshAccountsBtn" class="btn btn-outline" title="Làm mới">
+              🔄 Làm mới
+            </button>
+          </div>
+        </div>
+
+        <!-- Thống kê tổng số dư -->
+        <div class="summary-cards customer-only">
+          <div class="summary-card">
+            <span class="summary-label">Tổng số dư khả dụng</span>
+            <span id="totalBalanceDisplay" class="summary-value">0 VND</span>
+          </div>
+          <div class="summary-card">
+            <span class="summary-label">Số lượng tài khoản</span>
+            <span id="accountCountDisplay" class="summary-value">0 / 3</span>
+          </div>
+          <div class="summary-card">
+            <span class="summary-label">Hạn mức rút/chuyển trong ngày</span>
+            <span class="summary-value">200.000.000 VND</span>
+          </div>
+        </div>
+
+        <!-- Danh sách thẻ tài khoản -->
+        <div id="accountsList" class="accounts-grid">
+          <div class="loading-placeholder">Đang tải danh sách tài khoản...</div>
+        </div>
+      </div>
+
+      <!-- Tab Content 2: Chuyển khoản (CUSTOMER) -->
+      <div id="transferTab" class="tab-pane customer-only">
+        <div class="tab-header">
+          <div>
+            <h2 class="tab-title">Chuyển tiền nội bộ</h2>
+            <p class="tab-subtitle">Chuyển tiền nhanh chóng, an toàn và tức thì trong hệ thống Mini Bank</p>
+          </div>
+        </div>
+
+        <div class="transaction-panel">
+          <form id="transferForm" class="transaction-form">
+            <div class="form-group">
+              <label for="transferFromAccount">Tài khoản trích tiền (Nguồn) <span class="required">*</span></label>
+              <select id="transferFromAccount" required class="form-select">
+                <option value="">-- Chọn tài khoản nguồn --</option>
+              </select>
+              <div id="transferSourceBalanceHint" class="form-hint"></div>
+            </div>
+
+            <div class="form-group">
+              <label for="transferToAccount">Tài khoản thụ hưởng (Đích) <span class="required">*</span></label>
+              <input type="text" id="transferToAccount" required placeholder="Nhập 12 chữ số tài khoản đích" pattern="^\d{12}$" maxlength="12">
+            </div>
+
+            <div class="form-group">
+              <label for="transferAmount">Số tiền chuyển (VND) <span class="required">*</span></label>
+              <input type="number" id="transferAmount" required min="1000" max="50000000" step="1000" placeholder="Từ 1.000 đến 50.000.000 VND">
+              <div class="amount-quick-picks">
+                <button type="button" class="btn btn-xs btn-ghost quick-amount-btn" data-target="transferAmount" data-val="50000">50.000</button>
+                <button type="button" class="btn btn-xs btn-ghost quick-amount-btn" data-target="transferAmount" data-val="100000">100.000</button>
+                <button type="button" class="btn btn-xs btn-ghost quick-amount-btn" data-target="transferAmount" data-val="500000">500.000</button>
+                <button type="button" class="btn btn-xs btn-ghost quick-amount-btn" data-target="transferAmount" data-val="1000000">1.000.000</button>
+                <button type="button" class="btn btn-xs btn-ghost quick-amount-btn" data-target="transferAmount" data-val="5000000">5.000.000</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="transferDescription">Nội dung chuyển tiền</label>
+              <textarea id="transferDescription" rows="2" maxlength="200" placeholder="Tối đa 200 ký tự (tùy chọn)"></textarea>
+            </div>
+
+            <div class="notice-box">
+              <p>🛡️ <strong>Lưu ý an toàn:</strong> Giao dịch được bảo vệ bằng mã định danh Idempotency tự động, đảm bảo tài khoản không bao giờ bị trừ tiền hai lần dù mất kết nối mạng giữa chừng.</p>
+            </div>
+
+            <button type="submit" id="transferSubmitBtn" class="btn btn-primary btn-block">
+              <span>Xác nhận chuyển tiền</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Tab Content 3: Rút tiền (CUSTOMER) -->
+      <div id="withdrawTab" class="tab-pane customer-only">
+        <div class="tab-header">
+          <div>
+            <h2 class="tab-title">Rút tiền từ tài khoản</h2>
+            <p class="tab-subtitle">Rút tiền mặt mô phỏng từ tài khoản thanh toán đang hoạt động</p>
+          </div>
+        </div>
+
+        <div class="transaction-panel">
+          <form id="withdrawForm" class="transaction-form">
+            <div class="form-group">
+              <label for="withdrawFromAccount">Tài khoản rút tiền <span class="required">*</span></label>
+              <select id="withdrawFromAccount" required class="form-select">
+                <option value="">-- Chọn tài khoản nguồn --</option>
+              </select>
+              <div id="withdrawSourceBalanceHint" class="form-hint"></div>
+            </div>
+
+            <div class="form-group">
+              <label for="withdrawAmount">Số tiền rút (VND) <span class="required">*</span></label>
+              <input type="number" id="withdrawAmount" required min="1000" max="50000000" step="1000" placeholder="Từ 1.000 đến 50.000.000 VND">
+              <div class="amount-quick-picks">
+                <button type="button" class="btn btn-xs btn-ghost quick-amount-btn" data-target="withdrawAmount" data-val="50000">50.000</button>
+                <button type="button" class="btn btn-xs btn-ghost quick-amount-btn" data-target="withdrawAmount" data-val="100000">100.000</button>
+                <button type="button" class="btn btn-xs btn-ghost quick-amount-btn" data-target="withdrawAmount" data-val="500000">500.000</button>
+                <button type="button" class="btn btn-xs btn-ghost quick-amount-btn" data-target="withdrawAmount" data-val="1000000">1.000.000</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="withdrawDescription">Ghi chú rút tiền</label>
+              <textarea id="withdrawDescription" rows="2" maxlength="200" placeholder="Tối đa 200 ký tự (tùy chọn)"></textarea>
+            </div>
+
+            <button type="submit" id="withdrawSubmitBtn" class="btn btn-warning btn-block">
+              <span>Xác nhận rút tiền</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Tab Content 4: Nạp tiền (ADMIN) -->
+      <div id="depositTab" class="tab-pane admin-only hidden">
+        <div class="tab-header">
+          <div>
+            <h2 class="tab-title">Nạp tiền vào tài khoản (Tại quầy)</h2>
+            <p class="tab-subtitle">Chức năng chỉ dành cho Quản trị viên để ghi có tiền vào tài khoản khách hàng</p>
+          </div>
+        </div>
+
+        <div class="transaction-panel">
+          <form id="depositForm" class="transaction-form">
+            <div class="form-group">
+              <label for="depositToAccount">Số tài khoản thụ hưởng <span class="required">*</span></label>
+              <input type="text" id="depositToAccount" required placeholder="Nhập đúng 12 chữ số tài khoản" pattern="^\d{12}$" maxlength="12">
+            </div>
+
+            <div class="form-group">
+              <label for="depositAmount">Số tiền nạp (VND) <span class="required">*</span></label>
+              <input type="number" id="depositAmount" required min="1000" max="50000000" step="1000" placeholder="Từ 1.000 đến 50.000.000 VND">
+              <div class="amount-quick-picks">
+                <button type="button" class="btn btn-xs btn-ghost quick-amount-btn" data-target="depositAmount" data-val="1000000">1.000.000</button>
+                <button type="button" class="btn btn-xs btn-ghost quick-amount-btn" data-target="depositAmount" data-val="5000000">5.000.000</button>
+                <button type="button" class="btn btn-xs btn-ghost quick-amount-btn" data-target="depositAmount" data-val="10000000">10.000.000</button>
+                <button type="button" class="btn btn-xs btn-ghost quick-amount-btn" data-target="depositAmount" data-val="20000000">20.000.000</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="depositDescription">Nội dung nạp tiền</label>
+              <textarea id="depositDescription" rows="2" maxlength="200" placeholder="Ví dụ: Nạp tiền mặt tại quầy giao dịch"></textarea>
+            </div>
+
+            <button type="submit" id="depositSubmitBtn" class="btn btn-success btn-block">
+              <span>Xác nhận nạp tiền</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Tab Content 5: Lịch sử & Sao kê -->
+      <div id="historyTab" class="tab-pane">
+        <div class="tab-header">
+          <div>
+            <h2 class="tab-title">Lịch sử giao dịch & Sao kê sổ cái</h2>
+            <p class="tab-subtitle">Tra cứu chi tiết mọi biến động số dư và giao dịch thanh toán</p>
+          </div>
+        </div>
+
+        <!-- Filter bar -->
+        <div class="history-filter-bar">
+          <div class="filter-item">
+            <label for="historyAccountSelect">Chọn tài khoản:</label>
+            <select id="historyAccountSelect" class="form-select">
+              <option value="">-- Tất cả tài khoản --</option>
+            </select>
+          </div>
+
+          <div class="filter-item view-mode-switch">
+            <label>Chế độ xem:</label>
+            <div class="btn-group">
+              <button id="viewTransactionsBtn" class="btn btn-sm btn-primary active">Lịch sử Giao dịch</button>
+              <button id="viewPostingsBtn" class="btn btn-sm btn-outline">Sao kê Sổ cái</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bảng hiển thị kết quả -->
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead id="historyTableHead">
+              <!-- Render động theo chế độ xem -->
+            </thead>
+            <tbody id="historyTableBody">
+              <tr>
+                <td colspan="7" class="text-center empty-message">Vui lòng chọn tài khoản để xem dữ liệu</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Phân trang -->
+        <div id="paginationBar" class="pagination-bar hidden">
+          <button id="prevPageBtn" class="btn btn-sm btn-outline" disabled>⬅️ Trang trước</button>
+          <span id="pageIndicator" class="page-indicator">Trang 1</span>
+          <button id="nextPageBtn" class="btn btn-sm btn-outline">Trang sau ➡️</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal: Biên lai giao dịch thành công / thất bại -->
+  <div id="receiptModal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="receiptModalTitle" class="modal-title">Biên lai giao dịch</h3>
+        <button id="closeReceiptModalBtn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body" id="receiptModalBody">
+        <!-- Render nội dung biên lai -->
+      </div>
+      <div class="modal-footer">
+        <button id="receiptDoneBtn" class="btn btn-primary btn-block">Hoàn tất</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Đổi trạng thái tài khoản (Chỉ ADMIN) -->
+  <div id="statusModal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Cập nhật trạng thái tài khoản</h3>
+        <button id="closeStatusModalBtn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Tài khoản: <strong id="statusTargetAccountDisplay"></strong></p>
+        <div class="form-group mt-3">
+          <label for="newStatusSelect">Trạng thái mới: <span class="required">*</span></label>
+          <select id="newStatusSelect" class="form-select">
+            <option value="ACTIVE">ACTIVE (Hoạt động bình thường)</option>
+            <option value="FROZEN">FROZEN (Đóng băng - chỉ nhận tiền, cấm rút/chuyển)</option>
+            <option value="CLOSED">CLOSED (Đóng vĩnh viễn - cấm mọi giao dịch)</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="submitStatusBtn" class="btn btn-primary">Lưu thay đổi</button>
+        <button id="cancelStatusBtn" class="btn btn-outline">Hủy</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="footer-container">
+      <p>© 2026 Mini Bank · Hệ thống Microservices với PostgreSQL, Node.js & OpenShift</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
