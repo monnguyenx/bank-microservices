@@ -219,6 +219,16 @@ router.post('/deposit', async (req, res, next) => {
 
     const { toAccount, amount, description } = req.body;
 
+    if (description !== undefined && description !== null &&
+        (typeof description !== 'string' || description.length > 200)) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_DESCRIPTION',
+          message: 'Mô tả phải là chuỗi tối đa 200 ký tự',
+        },
+      });
+    }
+
     // BR-04: Kiểm tra số tiền
     if (!Number.isSafeInteger(amount) || amount < config.txnMinAmount || amount > config.txnMaxAmount) {
       return res.status(400).json({
@@ -323,6 +333,14 @@ router.post('/deposit', async (req, res, next) => {
       },
     });
   } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({
+        error: {
+          code: 'REQUEST_IN_PROGRESS',
+          message: 'Yêu cầu với Idempotency-Key này đang được xử lý, vui lòng thử lại sau giây lát',
+        },
+      });
+    }
     next(err);
   }
 });
@@ -355,6 +373,16 @@ router.post('/withdraw', async (req, res, next) => {
     }
 
     const { fromAccount, amount, description } = req.body;
+
+    if (description !== undefined && description !== null &&
+        (typeof description !== 'string' || description.length > 200)) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_DESCRIPTION',
+          message: 'Mô tả phải là chuỗi tối đa 200 ký tự',
+        },
+      });
+    }
 
     // BR-04: Kiểm tra số tiền
     if (!Number.isSafeInteger(amount) || amount < config.txnMinAmount || amount > config.txnMaxAmount) {
@@ -505,6 +533,14 @@ router.post('/withdraw', async (req, res, next) => {
       },
     });
   } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({
+        error: {
+          code: 'REQUEST_IN_PROGRESS',
+          message: 'Yêu cầu với Idempotency-Key này đang được xử lý, vui lòng thử lại sau giây lát',
+        },
+      });
+    }
     next(err);
   }
 });
@@ -537,6 +573,16 @@ router.post('/transfer', async (req, res, next) => {
     }
 
     const { fromAccount, toAccount, amount, description } = req.body;
+
+    if (description !== undefined && description !== null &&
+        (typeof description !== 'string' || description.length > 200)) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_DESCRIPTION',
+          message: 'Mô tả phải là chuỗi tối đa 200 ký tự',
+        },
+      });
+    }
 
     // BR-04: Kiểm tra số tiền
     if (!Number.isSafeInteger(amount) || amount < config.txnMinAmount || amount > config.txnMaxAmount) {
@@ -719,6 +765,14 @@ router.post('/transfer', async (req, res, next) => {
       },
     });
   } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({
+        error: {
+          code: 'REQUEST_IN_PROGRESS',
+          message: 'Yêu cầu với Idempotency-Key này đang được xử lý, vui lòng thử lại sau giây lát',
+        },
+      });
+    }
     next(err);
   }
 });
