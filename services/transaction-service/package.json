@@ -1,0 +1,17 @@
+{
+  "name": "transaction-service",
+  "version": "1.0.0",
+  "description": "Mini Bank - Transaction Service (xử lý giao dịch nạp, rút, chuyển khoản, kiểm tra hạn mức và ghi lịch sử)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.5"
+  }
+}
