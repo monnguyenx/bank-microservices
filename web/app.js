@@ -37,6 +37,7 @@
     SERVICE_UNAVAILABLE: 'Dịch vụ tạm thời không khả dụng, vui lòng thử lại sau',
     NETWORK_ERROR: 'Không thể kết nối đến máy chủ, vui lòng kiểm tra kết nối mạng',
     UNBALANCED_POSTING: 'Lỗi hạch toán sổ cái không cân bằng',
+    TRANSACTION_UNCONFIRMED: 'Chưa xác nhận được kết quả giao dịch. Vui lòng bấm Gửi lại sau ít phút để kiểm tra, không tạo giao dịch mới',
   };
 
   function getFriendlyMessage(err) {
@@ -591,12 +592,17 @@
             attempt++;
             showToast(`Yêu cầu đang xử lý, tự động gửi lại sau 2 giây (lần ${attempt}/${MAX_RETRIES})...`, 'info', 2500);
             await new Promise((resolve) => setTimeout(resolve, 2000));
-            // Tiếp tục vòng lặp với CÙNG key
             continue;
           }
 
-          // Lỗi nghiệp vụ khác (400, 403, 422...) hoặc đã hết số lần thử lại
-          // -> Coi như thất bại hẳn, xóa key để lần gửi sau sinh key mới
+          if (isRetryable) {
+            // Chưa biết kết quả: GIỮ key. Lần bấm sau gửi lại đúng giao dịch này, không tạo giao dịch mới
+            const pendingErr = new Error('Chưa xác nhận được kết quả giao dịch. Vui lòng bấm Gửi lại sau ít phút để kiểm tra, không tạo giao dịch mới.');
+            pendingErr.code = 'TRANSACTION_UNCONFIRMED';
+            throw pendingErr;
+          }
+
+          // Thất bại chắc chắn (400, 403, 422...): bỏ key để lần sau là giao dịch mới
           STATE.idempotency[formType].key = null;
           throw lastError;
         }
