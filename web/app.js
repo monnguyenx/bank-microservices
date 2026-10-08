@@ -831,11 +831,13 @@
         const query = new URLSearchParams({ page, size });
         if (account) query.append('account', account);
         const data = await api(`/api/transactions?${query.toString()}`);
-        renderTransactionsTable(data || [], account);
+        renderTransactionsTable((data && data.items) || [], account);
+        updatePaginationBar(data);
       } else {
         const query = new URLSearchParams({ page, size });
         const data = await api(`/api/accounts/${account}/postings?${query.toString()}`);
-        renderPostingsTable(data || []);
+        renderPostingsTable((data && data.items) || []);
+        updatePaginationBar(data);
       }
     } catch (err) {
       if (err.message !== 'UNAUTHORIZED') {
@@ -871,7 +873,6 @@
       emptyTd.colSpan = 7;
       emptyRow.appendChild(emptyTd);
       el.historyTableBody.appendChild(emptyRow);
-      el.paginationBar.classList.add('hidden');
       return;
     }
 
@@ -953,8 +954,6 @@
 
       el.historyTableBody.appendChild(row);
     });
-
-    updatePaginationBar(transactions.length);
   }
 
   /**
@@ -976,7 +975,6 @@
       emptyTd.colSpan = 5;
       emptyRow.appendChild(emptyTd);
       el.historyTableBody.appendChild(emptyRow);
-      el.paginationBar.classList.add('hidden');
       return;
     }
 
@@ -1014,15 +1012,14 @@
 
       el.historyTableBody.appendChild(row);
     });
-
-    updatePaginationBar(postings.length);
   }
 
-  function updatePaginationBar(itemCount) {
+  function updatePaginationBar(data) {
+    const totalPages = (data && data.totalPages) || 1;
     el.paginationBar.classList.remove('hidden');
-    el.pageIndicator.textContent = `Trang ${STATE.history.page}`;
+    el.pageIndicator.textContent = `Trang ${STATE.history.page} / ${totalPages}`;
     el.prevPageBtn.disabled = STATE.history.page <= 1;
-    el.nextPageBtn.disabled = itemCount < STATE.history.size;
+    el.nextPageBtn.disabled = STATE.history.page >= totalPages;
   }
 
   // --- 10. MODAL VÀ THAO TÁC ADMIN (RENDER AN TOÀN BẰNG TEXTCONTENT) ---
