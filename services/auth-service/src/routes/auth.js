@@ -18,6 +18,7 @@ const authMiddleware = require('../middleware/auth');
 const router = express.Router();
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const DUMMY_HASH = bcrypt.hashSync('dummy-password-for-timing', 10);
 
 /**
  * POST /api/auth/register
@@ -247,7 +248,7 @@ router.post('/login', async (req, res, next) => {
   try {
     const { username, password } = req.body;
 
-    if (!username || !password) {
+    if (typeof username !== 'string' || typeof password !== 'string' || !username.trim() || !password) {
       return res.status(400).json({
         error: {
           code: 'INVALID_INPUT',
@@ -256,29 +257,15 @@ router.post('/login', async (req, res, next) => {
       });
     }
 
-    // Tìm kiếm người dùng theo username
     const userRes = await pool.query(
       'SELECT id, username, password_hash, role, customer_id FROM auth_svc.users WHERE username = $1',
       [username.trim()]
     );
-
-    // Nếu không tìm thấy người dùng -> trả 401 INVALID_CREDENTIALS
-    if (userRes.rows.length === 0) {
-      return res.status(401).json({
-        error: {
-          code: 'INVALID_CREDENTIALS',
-          message: 'Tên đăng nhập hoặc mật khẩu không chính xác',
-        },
-      });
-    }
-
     const user = userRes.rows[0];
 
-    // So khớp mật khẩu đã hash với bcrypt
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    const isPasswordValid = await bcrypt.compare(password, user ? user.password_hash : DUMMY_HASH);
 
-    // Nếu sai mật khẩu -> cũng trả cùng lỗi 401 INVALID_CREDENTIALS để không lộ username
-    if (!isPasswordValid) {
+    if (!user || !isPasswordValid) {
       return res.status(401).json({
         error: {
           code: 'INVALID_CREDENTIALS',
