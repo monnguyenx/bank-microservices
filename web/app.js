@@ -278,7 +278,7 @@
 
       return data;
     } catch (err) {
-      if (err.message === 'Failed to fetch') {
+      if (err instanceof TypeError) {
         const netErr = new Error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại mạng.');
         netErr.status = 503;
         netErr.code = 'NETWORK_ERROR';
